@@ -1,0 +1,6 @@
+.env
+chroma_db/
+data/processed/
+data/chunks/
+__pycache__/
+*.py[cod]

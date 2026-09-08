@@ -1,0 +1,5 @@
+data_dir: data/raw
+chroma_db_dir: chroma_db
+chunking:
+  parent_size: 1800
+  child_size: 900
