@@ -1,5 +1,9 @@
-import argparse
+import argparse, sys
 from src.pipeline.rag_pipeline import RAGPipeline
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 if __name__ == "__main__":
     parser=argparse.ArgumentParser(); parser.add_argument("--rebuild",action="store_true"); args=parser.parse_args()
     app=RAGPipeline(); args.rebuild and app.rebuild() or app.load()

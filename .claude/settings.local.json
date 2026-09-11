@@ -1,0 +1,11 @@
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://coding-gateway.fissionlabs.com/gateway/anthropic",
+    "ANTHROPIC_AUTH_TOKEN": "cvg_O8bNy0eLzl5-k0CBD45Rthly6xQOyKQYzNu_UUm7atc",
+    "ANTHROPIC_CUSTOM_HEADERS": "x-client-app: claude-code\nx-project: RAG-FINANCIAL-"
+  },
+  "model": "kimi-k26",
+  "availableModels": [
+    "kimi-k26"
+  ]
+}

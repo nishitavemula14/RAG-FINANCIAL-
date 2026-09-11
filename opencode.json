@@ -1,0 +1,25 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "codevector": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "CodeVector",
+      "options": {
+        "apiKey": "{env:CODEVECTOR_API_KEY}",
+        "baseURL": "https://coding-gateway.fissionlabs.com/gateway/openai/v1",
+        "headers": {
+          "x-client-app": "opencode",
+          "x-project": "RAG2"
+        }
+      },
+      "models": {
+        "KIMI_K2_6_MODEL_ID": {  
+          "name": "Kimi K2.6"
+        },
+        "KIMI_K2_7_MODEL_ID": {
+          "name": "Kimi K2.7"
+        }
+      }
+    }
+  }
+}

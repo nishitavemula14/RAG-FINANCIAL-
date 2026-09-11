@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "projectName": "RAG-FINANCIAL-",
+  "ticketPattern": "[A-Z]+-\\d+",
+  "gateway": "https://coding-gateway.fissionlabs.com",
+  "tools": [
+    {
+      "tool": "claude-code",
+      "scope": "local",
+      "modelSlug": "kimi-k26"
+    }
+  ],
+  "groups": [
+    "Fission 4"
+  ]
+}
