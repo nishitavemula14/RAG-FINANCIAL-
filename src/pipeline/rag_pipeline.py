@@ -22,6 +22,8 @@ from src.vectorstore.chroma_db import ChromaStore
 # Retrieval imports
 from src.retrieval.similarity_search import DenseSimilaritySearch
 from src.retrieval.retriever import HybridRetriever
+from src.retrieval.query_rewriter import QueryRewriter
+from src.retrieval.reranker import LexicalReranker
 
 # Generation imports
 from src.generation.prompt import format_context, format_retrieved_sources
@@ -48,12 +50,13 @@ class Settings:
     chunk_overlap: int = int(env("CHUNK_OVERLAP", "150"))
     parent_chunk_size: int = int(env("PARENT_CHUNK_SIZE", "1800"))
     parent_chunk_overlap: int = int(env("PARENT_CHUNK_OVERLAP", "250"))
-    top_k: int = int(env("TOP_K", "5"))
+    top_k: int = int(env("TOP_K", "3"))
     dimensions: int = int(env("EMBEDDING_DIMENSIONS", "768"))
     collection: str = env("CHROMA_COLLECTION", "rag_documents")
     llm_provider: str = env("LLM_PROVIDER", "groq").lower()
     llm_model: str = env("LLM_MODEL", "openai/gpt-oss-20b")
     temperature: float = float(env("TEMPERATURE", "0.1"))
+    reranker: str = env("RERANKER", "lexical").lower()
 
 class RAGPipeline:
     """High-level facade orchestrating ingestion, embedding, storage, retrieval, and LLM answering."""
@@ -66,6 +69,12 @@ class RAGPipeline:
             model=self.s.llm_model,
             temperature=self.s.temperature
         )
+        self.query_rewriter = QueryRewriter(
+            provider=self.s.llm_provider,
+            model=self.s.llm_model,
+            temperature=0.0
+        )
+        self.reranker = LexicalReranker() if self.s.reranker == "lexical" else None
         self.chunks: List[Chunk] = []
         self.retriever: Optional[HybridRetriever] = None
 
@@ -83,9 +92,9 @@ class RAGPipeline:
         ingestion = IngestionPipeline(
             data_dir=self.s.data_dir,
             parent_chunk_size=self.s.parent_chunk_size,
-            parent_overlap=self.s.parent_chunk_overlap,
+            parent_chunk_overlap=self.s.parent_chunk_overlap,
             child_chunk_size=self.s.chunk_size,
-            child_overlap=self.s.chunk_overlap,
+            child_chunk_overlap=self.s.chunk_overlap,
         )
         self.chunks = ingestion.process()
         if not self.chunks:
@@ -114,14 +123,53 @@ class RAGPipeline:
         self.vector_store.get_collection()
         self._init_retriever()
 
-    def answer(self, query: str) -> str:
-        """Retrieves relevant parent chunks via hybrid search (or fallback) and generates answer."""
+    def answer_structured(self, query: str) -> dict:
+        """Retrieves relevant parent chunks via hybrid search (or fallback) and returns structured response dict."""
         if not self.retriever:
-            self._init_retriever()
+            if not self.chunks and Path("data/chunks/chunks.json").exists():
+                self.load()
+            else:
+                self._init_retriever()
 
-        found, mode = self.retriever.retrieve(query, top_k=self.s.top_k) if self.retriever else ([], "empty")
+        # Clean and rewrite query for any grammatical errors or typos
+        search_query = self.query_rewriter.rewrite(query) if self.query_rewriter else query
+        is_rewritten = bool(search_query and search_query.lower() != query.lower().strip())
+
+        # Retrieve candidates and apply reranker if enabled
+        fetch_k = max(15, self.s.top_k * 5) if self.reranker else self.s.top_k
+        found, mode = self.retriever.retrieve(search_query, top_k=fetch_k) if self.retriever else ([], "empty")
+        
+        if self.reranker and found:
+            found = self.reranker.rerank(search_query, found, top_k=self.s.top_k)
+        else:
+            found = found[:self.s.top_k]
+
         context = format_context(found)
-        answer = self.llm_generator.generate(query, context, found)
-        sources = format_retrieved_sources(found)
+        answer = self.llm_generator.generate(search_query, context, found)
 
-        return f"[{mode.upper()}] Answer:\n{answer}\n\nTop {len(found)} retrieved chunks:\n{sources}"
+        return {
+            "query": query,
+            "search_query": search_query,
+            "is_rewritten": is_rewritten,
+            "retrieval_mode": mode.upper(),
+            "answer": answer,
+            "found_chunks": found,
+            "sources": [
+                {
+                    "chunk_id": c.chunk_id,
+                    "parent_id": c.parent_id,
+                    "filename": c.filename,
+                    "page": c.page,
+                    "text": c.text,
+                }
+                for c in found
+            ],
+        }
+
+    def answer(self, query: str) -> str:
+        """Retrieves relevant parent chunks via hybrid search (or fallback) and generates answer string."""
+        res = self.answer_structured(query)
+        rewritten_note = f"[Query Optimized: \"{res['search_query']}\"]\n\n" if res["is_rewritten"] else ""
+        sources = format_retrieved_sources(res["found_chunks"])
+        return f"{rewritten_note}[{res['retrieval_mode']}] Answer:\n{res['answer']}\n\nTop {len(res['sources'])} retrieved chunks:\n{sources}"
+

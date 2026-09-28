@@ -16,8 +16,8 @@ class HybridRetriever:
         self,
         chunks: List[Any],
         dense_search: DenseSimilaritySearch,
-        vector_weight: float = 0.65,
-        bm25_weight: float = 0.35,
+        vector_weight: float = 0.5,
+        bm25_weight: float = 0.5,
         rrf_k: int = 60,
     ):
         self.chunks = chunks
@@ -44,8 +44,8 @@ class HybridRetriever:
         if not self.chunks:
             return [], "empty"
 
-        # 1. Dense vector candidate retrieval (top 25 candidates)
-        dense_candidates = self.dense_search.search(query, top_k=min(25, len(self.chunks)))
+        # 1. Dense vector candidate retrieval (top 40 candidates)
+        dense_candidates = self.dense_search.search(query, top_k=min(40, len(self.chunks)))
         dense_ranks: Dict[int, int] = {chunk_id: rank for rank, (chunk_id, _) in enumerate(dense_candidates)}
 
         # 2. Check BM25 viability
@@ -67,7 +67,7 @@ class HybridRetriever:
         else:
             mode = "hybrid"
             # Get top BM25 ranked candidates
-            ranked_bm25_indices = sorted(range(len(bm25_scores)), key=lambda i: bm25_scores[i], reverse=True)[:25]
+            ranked_bm25_indices = sorted(range(len(bm25_scores)), key=lambda i: bm25_scores[i], reverse=True)[:40]
             bm25_ranks: Dict[int, int] = {idx: rank for rank, idx in enumerate(ranked_bm25_indices) if bm25_scores[idx] > 0}
 
             # 3. Reciprocal Rank Fusion (RRF)

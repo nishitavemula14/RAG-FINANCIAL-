@@ -12,17 +12,28 @@ class DenseSimilaritySearch:
         Queries ChromaDB for nearest neighbors.
         Returns a list of (chunk_id, similarity_score) sorted by descending similarity.
         """
-        if not self.collection or self.collection.count() == 0:
+        if not self.collection:
             return []
 
-        n_results = min(top_k, self.collection.count())
+        try:
+            total_count = self.collection.count()
+        except Exception:
+            total_count = 0
+
+        if total_count == 0:
+            return []
+
+        n_results = min(top_k, total_count)
         query_vec = self.embed_fn([query], self.dimensions).tolist()
         
-        results = self.collection.query(
-            query_embeddings=query_vec,
-            n_results=n_results,
-            include=["distances"]
-        )
+        try:
+            results = self.collection.query(
+                query_embeddings=query_vec,
+                n_results=n_results,
+                include=["distances"]
+            )
+        except Exception:
+            results = None
 
         candidates: List[Tuple[int, float]] = []
         if results and "ids" in results and results["ids"]:

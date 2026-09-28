@@ -66,3 +66,10 @@ def test_fallback_to_pure_dense_search_on_zero_keyword_match():
     assert mode == "fallback_dense_similarity"
     assert len(results) == 2
     assert results[0].parent_id == 1
+
+def test_query_rewriter_fallback():
+    from src.retrieval.query_rewriter import QueryRewriter
+    # Without API keys or when offline, it normalizes and cleans the query cleanly
+    rewriter = QueryRewriter(provider="none")
+    cleaned = rewriter.rewrite("   what   is   walmart   revnue   in  2020  ?  ")
+    assert cleaned == "what is walmart revnue in 2020 ?"
